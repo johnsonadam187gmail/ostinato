@@ -56,9 +56,6 @@ export function PianoRoll() {
           <div className="w-24 md:w-32 flex-shrink-0 px-2">
             <span className="text-xs text-textMuted font-medium">Instrument</span>
           </div>
-          <div className="hidden md:block w-24 flex-shrink-0 px-2">
-            <span className="text-xs text-textMuted font-medium">Limb</span>
-          </div>
           <div className="flex-1 relative">
             <div className="flex justify-between text-xs text-textMuted px-1 mb-1">
               {Array.from({ length: beats }).map((_, i) => (
@@ -78,38 +75,6 @@ export function PianoRoll() {
             />
             </div>
           ))}
-        </div>
-        
-        <div className="mt-4 pt-4 border-t border-surfaceLight">
-          <div className="flex flex-col gap-2 md:hidden">
-            <span className="text-xs text-textMuted font-medium">Limb Assignment</span>
-            <div className="grid grid-cols-2 gap-2">
-              {INSTRUMENTS.map((instrument) => (
-                <div key={instrument.id} className="flex items-center gap-2">
-                  <span 
-                    className="w-8 text-xs font-semibold"
-                    style={{ color: instrument.color }}
-                  >
-                    {instrument.shortName}
-                  </span>
-                  <select
-                    value={usePatternStore.getState().limbAssignments[instrument.id] || 'none'}
-                    onChange={(e) => usePatternStore.getState().setLimbAssignment(
-                      instrument.id, 
-                      e.target.value as 'RH' | 'LH' | 'RF' | 'LF' | 'none'
-                    )}
-                    className="flex-1 bg-surfaceLight rounded px-2 py-1 text-xs text-text focus:outline-none focus:ring-1 focus:ring-primary"
-                  >
-                    <option value="RH">RH</option>
-                    <option value="LH">LH</option>
-                    <option value="RF">RF</option>
-                    <option value="LF">LF</option>
-                    <option value="none">None</option>
-                  </select>
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
       </div>
     </div>

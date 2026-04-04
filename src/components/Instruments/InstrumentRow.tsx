@@ -1,8 +1,7 @@
 import { useCallback, useState } from 'react';
 import { usePatternStore } from '../../stores/usePatternStore';
 import { useLibraryStore } from '../../stores/useLibraryStore';
-import { INSTRUMENTS, LIMB_LABELS } from '../../lib/instruments';
-import { Limb } from '../../types';
+import { INSTRUMENTS } from '../../lib/instruments';
 
 interface InstrumentRowProps {
   instrumentId: string;
@@ -18,18 +17,20 @@ export function InstrumentRow({ instrumentId }: InstrumentRowProps) {
     bars,
     mutedTracks,
     toggleMute,
-    limbAssignments,
-    setLimbAssignment,
     isPlaying,
     trackAssignments,
     assignOstinato,
     clearAssignment,
+    limbAssignments,
   } = usePatternStore();
   
   const getOstinatosByInstrument = useLibraryStore((s) => s.getOstinatosByInstrument);
   const getOstinatoById = useLibraryStore((s) => s.getOstinatoById);
+  const addOstinato = useLibraryStore((s) => s.addOstinato);
   
   const [showOstinatoSelect, setShowOstinatoSelect] = useState(false);
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [ostinatoName, setOstinatoName] = useState('');
   
   const track = tracks[instrumentId] || [];
   const isMuted = mutedTracks.has(instrumentId);
@@ -44,10 +45,6 @@ export function InstrumentRow({ instrumentId }: InstrumentRowProps) {
     toggleNote(instrumentId, step);
   }, [instrumentId, toggleNote]);
   
-  const handleLimbChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-    setLimbAssignment(instrumentId, e.target.value as Limb);
-  }, [instrumentId, setLimbAssignment]);
-  
   const handleOstinatoSelect = useCallback((ostinatoId: string) => {
     assignOstinato(instrumentId, ostinatoId);
     setShowOstinatoSelect(false);
@@ -56,6 +53,20 @@ export function InstrumentRow({ instrumentId }: InstrumentRowProps) {
   const handleClearAssignment = useCallback(() => {
     clearAssignment(instrumentId);
   }, [instrumentId, clearAssignment]);
+  
+  const handleSaveOstinato = useCallback(() => {
+    if (!ostinatoName.trim() || !instrument) return;
+    
+    addOstinato({
+      name: ostinatoName.trim(),
+      steps: [...track],
+      instrumentId: instrumentId,
+      limb: limbAssignments[instrumentId] || instrument.defaultLimb,
+    });
+    
+    setOstinatoName('');
+    setShowSaveModal(false);
+  }, [ostinatoName, track, instrumentId, instrument, limbAssignments, addOstinato]);
   
   if (!instrument) return null;
   
@@ -83,21 +94,7 @@ export function InstrumentRow({ instrumentId }: InstrumentRowProps) {
         </div>
       </div>
       
-      <div className="hidden md:block relative">
-        <select
-          value={limbAssignments[instrumentId] || 'none'}
-          onChange={handleLimbChange}
-          className="w-24 flex-shrink-0 bg-surfaceLight rounded-lg px-2 py-1 text-xs text-text focus:outline-none focus:ring-1 focus:ring-primary"
-        >
-          {Object.entries(LIMB_LABELS).map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
-        </select>
-      </div>
-      
-      <div className="flex-1 flex items-center gap-1">
+      <div className="flex-1 flex items-center gap-1 relative">
         <button
           onClick={() => setShowOstinatoSelect(!showOstinatoSelect)}
           className={`px-2 py-1 rounded text-xs flex-shrink-0 transition-colors ${
@@ -122,8 +119,18 @@ export function InstrumentRow({ instrumentId }: InstrumentRowProps) {
           </button>
         )}
         
+        <button
+          onClick={() => setShowSaveModal(true)}
+          className="p-1 text-textMuted hover:text-primary"
+          title="Save as ostinato"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+          </svg>
+        </button>
+        
         {showOstinatoSelect && (
-          <div className="absolute z-10 mt-1 bg-surface border border-border rounded-lg shadow-lg max-h-48 overflow-y-auto min-w-40">
+          <div className="absolute z-10 mt-1 bg-surface border border-border rounded-lg shadow-lg max-h-48 overflow-y-auto min-w-40 top-full left-0">
             {availableOstinatos.length === 0 ? (
               <div className="px-3 py-2 text-textMuted text-xs">
                 No ostinatos for this instrument
@@ -142,6 +149,35 @@ export function InstrumentRow({ instrumentId }: InstrumentRowProps) {
                 </button>
               ))
             )}
+          </div>
+        )}
+        
+        {showSaveModal && (
+          <div className="absolute z-20 top-full left-0 mt-1 bg-surface border border-border rounded-lg shadow-lg p-3 w-64">
+            <input
+              type="text"
+              value={ostinatoName}
+              onChange={(e) => setOstinatoName(e.target.value)}
+              placeholder="Ostinato name..."
+              className="w-full bg-background border border-border rounded px-2 py-1 text-xs text-text mb-2"
+              autoFocus
+              onKeyDown={(e) => e.key === 'Enter' && handleSaveOstinato()}
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={handleSaveOstinato}
+                disabled={!ostinatoName.trim()}
+                className="flex-1 px-2 py-1 bg-primary text-white rounded text-xs disabled:opacity-50"
+              >
+                Save
+              </button>
+              <button
+                onClick={() => setShowSaveModal(false)}
+                className="px-2 py-1 bg-surfaceLight text-text rounded text-xs"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         )}
         
