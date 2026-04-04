@@ -11,12 +11,22 @@ export interface Instrument {
   color: string;
 }
 
-export interface Pattern {
+export interface Ostinato {
+  id: string;
+  name: string;
+  steps: boolean[];
+  instrumentId: string;
+  limb: Limb;
+  createdAt: number;
+  isDefault: boolean;
+}
+
+export interface Beat {
   id: string;
   name: string;
   bars: number;
   subdivision: 16 | 32;
-  tracks: Record<string, boolean[]>;
+  trackAssignments: Record<string, string>;
 }
 
 export interface LimbAssignment {
@@ -29,12 +39,58 @@ export interface MetronomeSettings {
   volume: number;
 }
 
-export interface PatternPreset {
+export interface BeatPreset {
   id: string;
   name: string;
   description: string;
+  trackAssignments: Record<string, string>;
+  limbAssignments: LimbAssignment;
+}
+
+export interface MetronomeSettings {
+  bpm: number;
+  accentFirst: boolean;
+  volume: number;
+}
+
+export interface AppState {
+  bpm: number;
+  isPlaying: boolean;
+  currentBeat: number;
+  currentBar: number;
+  bars: number;
+  subdivision: 16 | 32;
   tracks: Record<string, boolean[]>;
   limbAssignments: LimbAssignment;
+  mutedTracks: Set<string>;
+  beatName: string;
+  beatId: string;
+  trackAssignments: Record<string, string>;
+}
+
+export interface ExportedBeat {
+  version: string;
+  name: string;
+  bars: number;
+  subdivision: 16 | 32;
+  trackAssignments: Record<string, string>;
+  limbAssignments: LimbAssignment;
+  tracks: Record<string, boolean[]>;
+}
+
+export interface ExportedOstinato {
+  version: string;
+  name: string;
+  instrumentId: string;
+  limb: Limb;
+  steps: boolean[];
+}
+
+export interface ExportedLibrary {
+  version: string;
+  exportedAt: number;
+  ostinatos: ExportedOstinato[];
+  beats: ExportedBeat[];
 }
 
 export interface AppState {

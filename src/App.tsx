@@ -2,9 +2,11 @@ import { useState } from 'react';
 import { Metronome } from './components/Metronome';
 import { Transport, PatternControls } from './components/Controls';
 import { PianoRoll } from './components/PianoRoll';
+import { LibraryPanel } from './components/Library/LibraryPanel';
 
 function App() {
   const [initialized, setInitialized] = useState(false);
+  const [showLibrary, setShowLibrary] = useState(false);
 
   const handleStart = async () => {
     setInitialized(true);
@@ -13,13 +15,23 @@ function App() {
   return (
     <div className="min-h-screen bg-background p-4 md:p-6">
       <div className="max-w-7xl mx-auto">
-        <header className="mb-6 md:mb-8">
-          <h1 className="text-2xl md:text-3xl font-bold text-text mb-2">
-            Ostinato
-          </h1>
-          <p className="text-textMuted text-sm md:text-base">
-            Drum Independence Trainer
-          </p>
+        <header className="mb-6 md:mb-8 flex justify-between items-start">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold text-text mb-2">
+              Ostinato
+            </h1>
+            <p className="text-textMuted text-sm md:text-base">
+              Drum Independence Trainer
+            </p>
+          </div>
+          {initialized && (
+            <button
+              onClick={() => setShowLibrary(true)}
+              className="px-4 py-2 bg-surface border border-border text-text rounded-lg hover:bg-surfaceHover transition-colors text-sm"
+            >
+              Library
+            </button>
+          )}
         </header>
 
         {!initialized && (
@@ -63,6 +75,10 @@ function App() {
           </div>
         )}
       </div>
+
+      {showLibrary && (
+        <LibraryPanel onClose={() => setShowLibrary(false)} />
+      )}
     </div>
   );
 }

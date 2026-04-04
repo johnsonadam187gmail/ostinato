@@ -2,9 +2,10 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { INSTRUMENTS, createEmptyPattern, createDefaultLimbAssignments } from '../lib/instruments';
 import { PRESETS } from '../lib/presets';
-import { Limb, ExportedPattern } from '../types';
+import { Limb, Beat, ExportedBeat, ExportedOstinato } from '../types';
+import { useLibraryStore } from './useLibraryStore';
 
-interface PatternStore {
+interface BeatStore {
   bpm: number;
   setBpm: (bpm: number) => void;
   
@@ -30,17 +31,29 @@ interface PatternStore {
   mutedTracks: Set<string>;
   toggleMute: (instrumentId: string) => void;
   
-  patternName: string;
-  setPatternName: (name: string) => void;
+  beatName: string;
+  setBeatName: (name: string) => void;
   
-  patternId: string;
-  setPatternId: (id: string) => void;
+  beatId: string;
+  setBeatId: (id: string) => void;
+  
+  trackAssignments: Record<string, string>;
+  assignOstinato: (instrumentId: string, ostinatoId: string) => void;
+  clearAssignment: (instrumentId: string) => void;
   
   loadPreset: (presetId: string) => void;
-  resetPattern: () => void;
+  resetBeat: () => void;
   
-  exportPattern: () => ExportedPattern;
-  importPattern: (data: ExportedPattern) => void;
+  exportBeat: () => ExportedBeat;
+  importBeat: (data: ExportedBeat) => void;
+  exportOstinato: (instrumentId: string) => ExportedOstinato | null;
+  importOstinato: (data: ExportedOstinato) => void;
+  
+  saveBeat: () => void;
+  loadBeatFromLibrary: (beatId: string) => void;
+  loadBeat: (beat: Beat) => void;
+  
+  getTrackSteps: (instrumentId: string) => boolean[];
   
   getTotalSteps: () => number;
 }
@@ -49,7 +62,7 @@ function generateId(): string {
   return Math.random().toString(36).substring(2, 9);
 }
 
-export const usePatternStore = create<PatternStore>()(
+export const useBeatStore = create<BeatStore>()(
   persist(
     (set, get) => ({
       bpm: 100,
@@ -130,49 +143,93 @@ export const usePatternStore = create<PatternStore>()(
         set({ mutedTracks: muted });
       },
       
-      patternName: 'New Pattern',
-      setPatternName: (name) => set({ patternName: name }),
+      beatName: 'New Beat',
+      setBeatName: (name) => set({ beatName: name }),
       
-      patternId: generateId(),
-      setPatternId: (id) => set({ patternId: id }),
+      beatId: generateId(),
+      setBeatId: (id) => set({ beatId: id }),
+      
+      trackAssignments: {},
+      assignOstinato: (instrumentId, ostinatoId) => {
+        const assignments = { ...get().trackAssignments };
+        assignments[instrumentId] = ostinatoId;
+        
+        const ostinato = useLibraryStore.getState().getOstinatoById(ostinatoId);
+        if (ostinato) {
+          const totalSteps = get().getTotalSteps();
+          const paddedSteps = [...ostinato.steps];
+          while (paddedSteps.length < totalSteps) {
+            paddedSteps.push(...ostinato.steps);
+          }
+          const tracks = { ...get().tracks };
+          tracks[instrumentId] = paddedSteps.slice(0, totalSteps);
+          set({ trackAssignments: assignments, tracks });
+        } else {
+          set({ trackAssignments: assignments });
+        }
+      },
+      clearAssignment: (instrumentId) => {
+        const assignments = { ...get().trackAssignments };
+        delete assignments[instrumentId];
+        set({ trackAssignments: assignments });
+      },
       
       loadPreset: (presetId) => {
         const preset = PRESETS.find((p) => p.id === presetId);
         if (preset) {
+          const newAssignments: Record<string, string> = {};
+          const tracks = createEmptyPattern(get().bars, get().subdivision);
+          const totalSteps = get().getTotalSteps();
+          
+          Object.entries(preset.trackAssignments).forEach(([instrumentId, ostinatoId]) => {
+            newAssignments[instrumentId] = ostinatoId;
+            const ostinato = useLibraryStore.getState().getOstinatoById(ostinatoId);
+            if (ostinato) {
+              let paddedSteps = [...ostinato.steps];
+              while (paddedSteps.length < totalSteps) {
+                paddedSteps.push(...ostinato.steps);
+              }
+              tracks[instrumentId] = paddedSteps.slice(0, totalSteps);
+            }
+          });
+          
           set({
-            tracks: { ...preset.tracks },
+            trackAssignments: newAssignments,
+            tracks,
             limbAssignments: { ...preset.limbAssignments },
-            patternName: preset.name,
-            patternId: generateId(),
+            beatName: preset.name,
+            beatId: generateId(),
           });
         }
       },
       
-      resetPattern: () => {
+      resetBeat: () => {
         const bars = get().bars;
         const subdivision = get().subdivision;
         set({
           tracks: createEmptyPattern(bars, subdivision),
           limbAssignments: createDefaultLimbAssignments(),
-          patternName: 'New Pattern',
-          patternId: generateId(),
+          beatName: 'New Beat',
+          beatId: generateId(),
           mutedTracks: new Set(),
+          trackAssignments: {},
         });
       },
       
-      exportPattern: () => {
+      exportBeat: () => {
         const state = get();
         return {
           version: '1.0',
-          name: state.patternName,
+          name: state.beatName,
           bars: state.bars,
           subdivision: state.subdivision,
-          tracks: state.tracks,
+          trackAssignments: state.trackAssignments,
           limbAssignments: state.limbAssignments,
+          tracks: state.tracks,
         };
       },
       
-      importPattern: (data: ExportedPattern) => {
+      importBeat: (data: ExportedBeat) => {
         const totalSteps = data.bars * data.subdivision;
         const tracks: Record<string, boolean[]> = {};
         
@@ -191,12 +248,85 @@ export const usePatternStore = create<PatternStore>()(
         
         set({
           tracks,
+          trackAssignments: data.trackAssignments || {},
           limbAssignments: data.limbAssignments,
-          patternName: data.name,
-          patternId: generateId(),
+          beatName: data.name,
+          beatId: generateId(),
           bars: data.bars,
           subdivision: data.subdivision,
         });
+      },
+      
+      exportOstinato: (instrumentId) => {
+        const state = get();
+        const instrument = INSTRUMENTS.find(i => i.id === instrumentId);
+        if (!instrument) return null;
+        
+        return {
+          version: '1.0',
+          name: `${state.beatName} - ${instrument.name}`,
+          instrumentId: instrumentId,
+          limb: state.limbAssignments[instrumentId] || instrument.defaultLimb,
+          steps: state.tracks[instrumentId] || [],
+        };
+      },
+      
+      importOstinato: (data: ExportedOstinato) => {
+        useLibraryStore.getState().addOstinato({
+          name: data.name,
+          instrumentId: data.instrumentId,
+          limb: data.limb,
+          steps: data.steps,
+        });
+      },
+      
+      saveBeat: () => {
+        const state = get();
+        useLibraryStore.getState().addBeat({
+          name: state.beatName,
+          bars: state.bars,
+          subdivision: state.subdivision,
+          trackAssignments: state.trackAssignments,
+        });
+      },
+      
+      loadBeatFromLibrary: (beatId) => {
+        const beat = useLibraryStore.getState().getBeatById(beatId);
+        if (beat) {
+          get().loadBeat(beat);
+        }
+      },
+      
+      loadBeat: (beat) => {
+        const totalSteps = beat.bars * beat.subdivision;
+        const tracks = createEmptyPattern(beat.bars, beat.subdivision);
+        const newAssignments: Record<string, string> = {};
+        
+        Object.entries(beat.trackAssignments).forEach(([instrumentId, ostinatoId]) => {
+          newAssignments[instrumentId] = ostinatoId;
+          const ostinato = useLibraryStore.getState().getOstinatoById(ostinatoId);
+          if (ostinato) {
+            let paddedSteps = [...ostinato.steps];
+            while (paddedSteps.length < totalSteps) {
+              paddedSteps.push(...ostinato.steps);
+            }
+            tracks[instrumentId] = paddedSteps.slice(0, totalSteps);
+          }
+        });
+        
+        set({
+          beatId: beat.id,
+          beatName: beat.name,
+          bars: beat.bars,
+          subdivision: beat.subdivision,
+          trackAssignments: newAssignments,
+          tracks,
+        });
+      },
+      
+      getTrackSteps: (instrumentId) => {
+        const state = get();
+        return state.tracks[instrumentId] || [];
       },
       
       getTotalSteps: () => {
@@ -213,10 +343,11 @@ export const usePatternStore = create<PatternStore>()(
         tracks: state.tracks,
         limbAssignments: state.limbAssignments,
         mutedTracks: Array.from(state.mutedTracks),
-        patternName: state.patternName,
+        beatName: state.beatName,
+        trackAssignments: state.trackAssignments,
       }),
       merge: (persisted: unknown, current) => {
-        const p = persisted as Partial<PatternStore> & { mutedTracks?: string[] };
+        const p = persisted as Partial<BeatStore> & { mutedTracks?: string[] };
         return {
           ...current,
           ...p,
@@ -226,3 +357,5 @@ export const usePatternStore = create<PatternStore>()(
     }
   )
 );
+
+export const usePatternStore = useBeatStore;
