@@ -122,7 +122,9 @@ export function InstrumentRow({ instrumentId }: InstrumentRowProps) {
         </div>
       </div>
       
-      <div className="flex-1 flex items-center gap-1 relative">
+      <div 
+        className="flex-1 flex items-center gap-1 relative"
+      >
         <button
           onClick={() => setShowOstinatoSelect(!showOstinatoSelect)}
           className={`px-2 py-1 rounded text-xs flex-shrink-0 transition-colors ${
