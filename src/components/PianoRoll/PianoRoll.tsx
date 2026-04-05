@@ -18,13 +18,13 @@ export function PianoRoll() {
   const beats = bars * 4;
   
   const controlsWidth = useMemo(() => {
-    let maxWidth = 160;
+    let maxWidth = 240;
     INSTRUMENTS.forEach((inst) => {
       const assignedId = trackAssignments[inst.id];
       if (assignedId) {
         const ost = getOstinatoById(assignedId);
         if (ost) {
-          const btnWidth = ost.name.length * 8 + 70;
+          const btnWidth = ost.name.length * 8 + 160;
           if (btnWidth > maxWidth) maxWidth = btnWidth;
         }
       }
@@ -78,12 +78,20 @@ export function PianoRoll() {
           <div className="w-24 md:w-32 flex-shrink-0 px-2">
             <span className="text-xs text-textMuted font-medium">Instrument</span>
           </div>
-          <div className="flex-1 relative">
-            <div className="flex justify-between text-xs text-textMuted px-1 mb-1">
-              {Array.from({ length: beats }).map((_, i) => (
-                <span key={i} className="w-5 text-center">{i + 1}</span>
-              ))}
-            </div>
+          <div className="flex-1 relative h-4 overflow-visible">
+            {Array.from({ length: beats }).map((_, i) => {
+              const stepPosition = i * subdivisionPerBeat * 4;
+              const barPosition = (stepPosition + 1) / totalSteps * 100;
+              return (
+                <span 
+                  key={i} 
+                  className="absolute text-xs text-textMuted"
+                  style={{ left: `${barPosition}%` }}
+                >
+                  {i + 1}
+                </span>
+              );
+            })}
           </div>
         </div>
         
@@ -219,26 +227,26 @@ function ChannelRow({
         </div>
       </div>
       
-      <div className="relative" style={{ width: controlsWidth }}>
-        <button onClick={() => setShowOstinatoSelect(!showOstinatoSelect)} className={`px-2 py-1 rounded text-xs transition-colors absolute left-0 ${assignedOstinato ? 'bg-primary/20 text-primary border border-primary/30' : 'bg-surfaceLight text-textMuted hover:text-text'}`}>
+      <div className="flex items-center gap-1" style={{ width: controlsWidth }}>
+        <button onClick={() => setShowOstinatoSelect(!showOstinatoSelect)} className={`px-2 py-1 rounded text-xs flex-shrink-0 transition-colors ${assignedOstinato ? 'bg-primary/20 text-primary border border-primary/30' : 'bg-surfaceLight text-textMuted hover:text-text'}`}>
           {assignedOstinato ? assignedOstinato.name : 'Select'}
         </button>
         
         {assignedOstinato && (
-          <button onClick={handleClearAssignment} className="p-1 text-textMuted hover:text-red-500 absolute" style={{ left: assignedOstinato.name.length * 8 + 20 }} title="Clear assignment">
+          <button onClick={handleClearAssignment} className="p-1 text-textMuted hover:text-red-500 flex-shrink-0" title="Clear assignment">
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         )}
         
-        <button onClick={() => setShowSaveModal(true)} className="p-1 text-textMuted hover:text-primary absolute" style={{ left: assignedOstinato ? assignedOstinato.name.length * 8 + 48 : 60 }} title="Save as ostinato">
+        <button onClick={() => setShowSaveModal(true)} className="p-1 text-textMuted hover:text-primary flex-shrink-0" title="Save as ostinato">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
         </button>
 
-        <div className="absolute" style={{ left: assignedOstinato ? assignedOstinato.name.length * 8 + 80 : 92 }}>
+        <div className="flex-shrink-0">
           <input type="range" min="0" max="100" value={channelSettings.volume} onChange={(e) => handleVolumeChange(parseInt(e.target.value))} className="w-16 h-1.5 rounded-full cursor-pointer" style={{ background: `linear-gradient(to right, ${instrument.color} 0%, ${instrument.color} ${channelSettings.volume}%, #2d3748 ${channelSettings.volume}%, #2d3748 100%)` }} title={`Volume: ${channelSettings.volume}%`} />
         </div>
         
-        <button onClick={() => setShowEQModal(true)} className="p-1 text-textMuted hover:text-primary absolute" style={{ left: assignedOstinato ? assignedOstinato.name * 8 + 110 : 122 }} title="EQ Settings">
+        <button onClick={() => setShowEQModal(true)} className="p-1 text-textMuted hover:text-primary flex-shrink-0" title="EQ Settings">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
         </button>
         

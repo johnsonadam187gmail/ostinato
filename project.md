@@ -30,10 +30,12 @@ src/
 │   ├── Controls/            # Transport, Beat controls
 │   ├── Metronome/           # Metronome toggle
 │   ├── Library/             # Ostinato & Beat library browser
+│   ├── EQModal/             # 3-band EQ popup for channel settings
 │   └── OstinatoEditor/      # Modal for editing/creating ostinatos
 ├── stores/
 │   ├── usePatternStore.ts   # Current beat state (tracks, assignments, etc.)
-│   └── useLibraryStore.ts   # Library state (saved ostinatos & beats)
+│   ├── useLibraryStore.ts   # Library state (saved ostinatos & beats)
+│   └── useChannelStore.ts   # Per-channel volume and EQ settings (persisted)
 ├── lib/
 │   ├── instruments.ts       # Instrument definitions
 │   ├── defaultOstinatos.ts # Pre-populated default ostinato patterns
@@ -106,6 +108,36 @@ Each built-in preset (Basic Rock, Jazz Swing, etc.) references these default ost
 4. **Export/Import**: Export/import individual ostinatos or full beats as JSON files
 5. **Preset Loading**: Load built-in presets that combine default ostinatos
 6. **Manual Editing**: Toggle notes directly on the piano roll; changes don't auto-save
+7. **Per-Channel Volume & EQ**: Volume slider and 3-band EQ for each instrument channel
+8. **Metronome Controls**: Volume and EQ for metronome
+
+## Recent Changes
+
+- Added per-channel volume sliders and EQ controls (Low 100Hz, Mid 1kHz, High 8kHz)
+- Added metronome volume and EQ controls
+- Settings persist to localStorage
+- Added EQ modal popup for detailed equalizer adjustment
+
+## Current Issues / Next Steps
+
+### Beat Tracking Alignment Issue
+
+The beat tracking (red highlight that moves during playback) is not properly aligned with the piano roll grid. The highlight appears under the instrument controls section instead of on the actual grid cells.
+
+**Root Cause**: The `renderBeatMarkers()` function and the beat tracking logic use percentage-based positioning, but the beat markers and piano roll grid may not be properly aligned with each other or with the actual beat position.
+
+**Affected Components**:
+- `src/components/PianoRoll/PianoRoll.tsx` - beat markers and playhead positioning
+
+**Required Fixes**:
+1. Ensure beat markers render in the same container/position as the piano roll grid
+2. Verify `currentStep` is correctly mapped to grid cell positions
+3. Ensure the playhead uses the same percentage calculation as the beat markers
+4. The beat tracking should only highlight grid cells, not the controls area
+
+### Piano Roll Controls Layout
+
+The instrument controls (ostinato select, save button, volume slider, EQ button) currently sit between the instrument label and the piano roll grid. When an ostinato is selected, the controls area width adjusts based on the name length to ensure all controls remain visible and the piano roll grid stays aligned across all channels.
 
 ## Commands
 
