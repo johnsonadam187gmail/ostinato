@@ -14,15 +14,35 @@ const SAMPLE_URLS: Record<string, Record<string, string>> = {
   ride: { C3: `${SAMPLE_BASE_URL}/tom2.mp3` },
 };
 
+interface ChannelSettings {
+  volume: number;
+  eqLow: number;
+  eqMid: number;
+  eqHigh: number;
+}
+
+const DEFAULT_CHANNEL_SETTINGS: ChannelSettings = {
+  volume: 0.8,
+  eqLow: 0,
+  eqMid: 0,
+  eqHigh: 0,
+};
+
 class AudioEngine {
   private samplers: Map<string, Tone.Sampler> = new Map();
   private synths: Map<string, Tone.MembraneSynth | Tone.NoiseSynth | Tone.MetalSynth> = new Map();
+  private channelEQs: Map<string, Tone.EQ3> = new Map();
+  private channelGains: Map<string, Tone.Gain> = new Map();
   private metronomeSynth: Tone.Synth | null = null;
   private metronomeAccentSynth: Tone.Synth | null = null;
+  private metronomeGain: Tone.Gain | null = null;
+  private metronomeEQ: Tone.EQ3 | null = null;
   private masterGain: Tone.Gain | null = null;
   private initialized = false;
   private loadedCount = 0;
   private totalSamples = 0;
+  private channelSettings: Map<string, ChannelSettings> = new Map();
+  private metronomeSettings: ChannelSettings = { ...DEFAULT_CHANNEL_SETTINGS };
 
   async initialize(): Promise<void> {
     if (this.initialized) return;
@@ -31,16 +51,23 @@ class AudioEngine {
     
     this.masterGain = new Tone.Gain(0.8).toDestination();
     
+    this.metronomeGain = new Tone.Gain(0.8).toDestination();
+    this.metronomeEQ = new Tone.EQ3({
+      low: 0,
+      mid: 0,
+      high: 0,
+    }).connect(this.metronomeGain);
+    
     this.metronomeSynth = new Tone.Synth({
       oscillator: { type: 'sine' },
       envelope: { attack: 0.001, decay: 0.1, sustain: 0, release: 0.1 },
-    }).connect(this.masterGain);
+    }).connect(this.metronomeEQ);
     this.metronomeSynth.volume.value = -10;
     
     this.metronomeAccentSynth = new Tone.Synth({
       oscillator: { type: 'sine' },
       envelope: { attack: 0.001, decay: 0.15, sustain: 0, release: 0.1 },
-    }).connect(this.masterGain);
+    }).connect(this.metronomeEQ);
     this.metronomeAccentSynth.volume.value = -5;
 
     const sampleInstruments = INSTRUMENTS.filter(i => SAMPLE_URLS[i.id]);
@@ -51,20 +78,41 @@ class AudioEngine {
     sampleInstruments.forEach((instrument) => {
       const urls = SAMPLE_URLS[instrument.id];
       
+      const eq = new Tone.EQ3({
+        low: 0,
+        mid: 0,
+        high: 0,
+      }).connect(this.masterGain!);
+      this.channelEQs.set(instrument.id, eq);
+      
+      const gain = new Tone.Gain(0.8).connect(eq);
+      this.channelGains.set(instrument.id, gain);
+      this.channelSettings.set(instrument.id, { ...DEFAULT_CHANNEL_SETTINGS });
+      
       const sampler = new Tone.Sampler({
         urls,
         onload: () => {
           this.loadedCount++;
           console.log(`Loaded ${instrument.name} (${this.loadedCount}/${this.totalSamples})`);
         },
-      }).connect(this.masterGain!);
+      }).connect(gain);
       
       this.samplers.set(instrument.id, sampler);
     });
 
     synthInstruments.forEach((instrument) => {
       let synth: Tone.MembraneSynth | Tone.NoiseSynth | Tone.MetalSynth;
-      const destination = this.masterGain!;
+      
+      const eq = new Tone.EQ3({
+        low: 0,
+        mid: 0,
+        high: 0,
+      }).connect(this.masterGain!);
+      this.channelEQs.set(instrument.id, eq);
+      
+      const gain = new Tone.Gain(0.8).connect(eq);
+      this.channelGains.set(instrument.id, gain);
+      this.channelSettings.set(instrument.id, { ...DEFAULT_CHANNEL_SETTINGS });
       
       switch (instrument.synthType) {
         case 'membrane':
@@ -78,7 +126,7 @@ class AudioEngine {
               sustain: 0,
               release: 0.1,
             },
-          }).connect(destination);
+          }).connect(gain);
           break;
         case 'noise':
           synth = new Tone.NoiseSynth({
@@ -89,7 +137,7 @@ class AudioEngine {
               sustain: 0,
               release: 0.1,
             },
-          }).connect(destination);
+          }).connect(gain);
           break;
         case 'metal':
           synth = new Tone.MetalSynth({
@@ -102,7 +150,7 @@ class AudioEngine {
             modulationIndex: 32,
             resonance: 4000,
             octaves: 1.5,
-          }).connect(destination);
+          }).connect(gain);
           synth.frequency.value = 250;
           break;
         default:
@@ -169,6 +217,58 @@ class AudioEngine {
     }
   }
 
+  setChannelVolume(instrumentId: string, volume: number): void {
+    const gain = this.channelGains.get(instrumentId);
+    if (gain) {
+      gain.gain.value = volume;
+      const settings = this.channelSettings.get(instrumentId);
+      if (settings) {
+        settings.volume = volume;
+      }
+    }
+  }
+
+  setChannelEQ(instrumentId: string, low: number, mid: number, high: number): void {
+    const eq = this.channelEQs.get(instrumentId);
+    if (eq) {
+      eq.low.value = low;
+      eq.mid.value = mid;
+      eq.high.value = high;
+      const settings = this.channelSettings.get(instrumentId);
+      if (settings) {
+        settings.eqLow = low;
+        settings.eqMid = mid;
+        settings.eqHigh = high;
+      }
+    }
+  }
+
+  getChannelSettings(instrumentId: string): ChannelSettings {
+    return this.channelSettings.get(instrumentId) || { ...DEFAULT_CHANNEL_SETTINGS };
+  }
+
+  setMetronomeVolume(volume: number): void {
+    if (this.metronomeGain) {
+      this.metronomeGain.gain.value = volume;
+      this.metronomeSettings.volume = volume;
+    }
+  }
+
+  setMetronomeEQ(low: number, mid: number, high: number): void {
+    if (this.metronomeEQ) {
+      this.metronomeEQ.low.value = low;
+      this.metronomeEQ.mid.value = mid;
+      this.metronomeEQ.high.value = high;
+      this.metronomeSettings.eqLow = low;
+      this.metronomeSettings.eqMid = mid;
+      this.metronomeSettings.eqHigh = high;
+    }
+  }
+
+  getMetronomeSettings(): ChannelSettings {
+    return { ...this.metronomeSettings };
+  }
+
   isInitialized(): boolean {
     return this.initialized;
   }
@@ -178,8 +278,14 @@ class AudioEngine {
     this.samplers.clear();
     this.synths.forEach((synth) => synth.dispose());
     this.synths.clear();
+    this.channelEQs.forEach((eq) => eq.dispose());
+    this.channelEQs.clear();
+    this.channelGains.forEach((gain) => gain.dispose());
+    this.channelGains.clear();
     this.metronomeSynth?.dispose();
     this.metronomeAccentSynth?.dispose();
+    this.metronomeGain?.dispose();
+    this.metronomeEQ?.dispose();
     this.masterGain?.dispose();
     this.initialized = false;
   }

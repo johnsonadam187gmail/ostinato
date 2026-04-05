@@ -1,13 +1,26 @@
-import { useCallback } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { usePatternStore } from '../../stores/usePatternStore';
+import { useChannelStore } from '../../stores/useChannelStore';
+import { audioEngine } from '../../hooks/useAudioEngine';
+import { EQModal } from '../EQModal';
 
 export function Metronome() {
   const { bpm, setBpm } = usePatternStore();
   const { currentStep, subdivision, bars } = usePatternStore();
   const { isPlaying } = usePatternStore();
   
+  const { setMetronomeVolume, setMetronomeEQ, metronome } = useChannelStore();
+  const [showEQModal, setShowEQModal] = useState(false);
+  
   const subdivisionPerBeat = subdivision / 4;
   const totalBeats = bars * 4;
+  
+  useEffect(() => {
+    if (audioEngine.isInitialized()) {
+      audioEngine.setMetronomeVolume(metronome.volume / 100);
+      audioEngine.setMetronomeEQ(metronome.eqLow, metronome.eqMid, metronome.eqHigh);
+    }
+  }, [metronome.volume, metronome.eqLow, metronome.eqMid, metronome.eqHigh]);
   
   const handleBpmChange = useCallback((delta: number) => {
     setBpm(bpm + delta);
@@ -19,6 +32,20 @@ export function Metronome() {
       setBpm(value);
     }
   }, [setBpm]);
+  
+  const handleVolumeChange = useCallback((volume: number) => {
+    setMetronomeVolume(volume);
+    if (audioEngine.isInitialized()) {
+      audioEngine.setMetronomeVolume(volume / 100);
+    }
+  }, [setMetronomeVolume]);
+  
+  const handleEQChange = useCallback((low: number, mid: number, high: number) => {
+    setMetronomeEQ(low, mid, high);
+    if (audioEngine.isInitialized()) {
+      audioEngine.setMetronomeEQ(low, mid, high);
+    }
+  }, [setMetronomeEQ]);
   
   const getBeatClass = (beatIndex: number) => {
     if (!isPlaying) return 'bg-accent';
@@ -77,6 +104,33 @@ export function Metronome() {
             +
           </button>
         </div>
+
+        <div className="flex items-center gap-2">
+          <svg className="w-4 h-4 text-textMuted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072M6 8l8 4-8 4V8z" />
+          </svg>
+          <input
+            type="range"
+            min="0"
+            max="100"
+            value={metronome.volume}
+            onChange={(e) => handleVolumeChange(parseInt(e.target.value))}
+            className="w-20 h-1.5 rounded-full cursor-pointer"
+            style={{
+              background: `linear-gradient(to right, #8b5cf6 0%, #8b5cf6 ${metronome.volume}%, #2d3748 ${metronome.volume}%, #2d3748 100%)`,
+            }}
+            title={`Metronome Volume: ${metronome.volume}%`}
+          />
+          <button
+            onClick={() => setShowEQModal(true)}
+            className="p-1 text-textMuted hover:text-primary"
+            title="EQ Settings"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+            </svg>
+          </button>
+        </div>
         
         <div className="flex items-center gap-2 ml-auto">
           {Array.from({ length: totalBeats }).map((_, i) => (
@@ -87,6 +141,17 @@ export function Metronome() {
           ))}
         </div>
       </div>
+
+      {showEQModal && (
+        <EQModal
+          channelId="metronome"
+          title="Metronome"
+          settings={metronome}
+          onVolumeChange={handleVolumeChange}
+          onEQChange={handleEQChange}
+          onClose={() => setShowEQModal(false)}
+        />
+      )}
     </div>
   );
 }

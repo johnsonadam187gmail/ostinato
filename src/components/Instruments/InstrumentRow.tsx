@@ -1,7 +1,10 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { usePatternStore } from '../../stores/usePatternStore';
 import { useLibraryStore } from '../../stores/useLibraryStore';
+import { useChannelStore } from '../../stores/useChannelStore';
 import { INSTRUMENTS } from '../../lib/instruments';
+import { audioEngine } from '../../hooks/useAudioEngine';
+import { EQModal } from '../EQModal';
 
 interface InstrumentRowProps {
   instrumentId: string;
@@ -28,8 +31,12 @@ export function InstrumentRow({ instrumentId }: InstrumentRowProps) {
   const getOstinatoById = useLibraryStore((s) => s.getOstinatoById);
   const addOstinato = useLibraryStore((s) => s.addOstinato);
   
+  const { setChannelVolume, setChannelEQ, getChannel } = useChannelStore();
+  const channelSettings = getChannel(instrumentId);
+  
   const [showOstinatoSelect, setShowOstinatoSelect] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
+  const [showEQModal, setShowEQModal] = useState(false);
   const [ostinatoName, setOstinatoName] = useState('');
   
   const track = tracks[instrumentId] || [];
@@ -41,6 +48,13 @@ export function InstrumentRow({ instrumentId }: InstrumentRowProps) {
   const assignedOstinato = assignedOstinatoId ? getOstinatoById(assignedOstinatoId) : null;
   const availableOstinatos = getOstinatosByInstrument(instrumentId);
   
+  useEffect(() => {
+    if (audioEngine.isInitialized()) {
+      audioEngine.setChannelVolume(instrumentId, channelSettings.volume / 100);
+      audioEngine.setChannelEQ(instrumentId, channelSettings.eqLow, channelSettings.eqMid, channelSettings.eqHigh);
+    }
+  }, [channelSettings.volume, channelSettings.eqLow, channelSettings.eqMid, channelSettings.eqHigh, instrumentId]);
+
   const handleToggle = useCallback((step: number) => {
     toggleNote(instrumentId, step);
   }, [instrumentId, toggleNote]);
@@ -67,6 +81,20 @@ export function InstrumentRow({ instrumentId }: InstrumentRowProps) {
     setOstinatoName('');
     setShowSaveModal(false);
   }, [ostinatoName, track, instrumentId, instrument, limbAssignments, addOstinato]);
+
+  const handleVolumeChange = useCallback((volume: number) => {
+    setChannelVolume(instrumentId, volume);
+    if (audioEngine.isInitialized()) {
+      audioEngine.setChannelVolume(instrumentId, volume / 100);
+    }
+  }, [instrumentId, setChannelVolume]);
+
+  const handleEQChange = useCallback((low: number, mid: number, high: number) => {
+    setChannelEQ(instrumentId, low, mid, high);
+    if (audioEngine.isInitialized()) {
+      audioEngine.setChannelEQ(instrumentId, low, mid, high);
+    }
+  }, [instrumentId, setChannelEQ]);
   
   if (!instrument) return null;
   
@@ -128,6 +156,30 @@ export function InstrumentRow({ instrumentId }: InstrumentRowProps) {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
           </svg>
         </button>
+
+        <div className="flex items-center gap-1 px-1">
+          <input
+            type="range"
+            min="0"
+            max="100"
+            value={channelSettings.volume}
+            onChange={(e) => handleVolumeChange(parseInt(e.target.value))}
+            className="w-16 h-1.5 rounded-full cursor-pointer"
+            style={{
+              background: `linear-gradient(to right, ${instrument.color} 0%, ${instrument.color} ${channelSettings.volume}%, #2d3748 ${channelSettings.volume}%, #2d3748 100%)`,
+            }}
+            title={`Volume: ${channelSettings.volume}%`}
+          />
+          <button
+            onClick={() => setShowEQModal(true)}
+            className="p-1 text-textMuted hover:text-primary"
+            title="EQ Settings"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+            </svg>
+          </button>
+        </div>
         
         {showOstinatoSelect && (
           <div className="absolute z-10 mt-1 bg-surface border border-border rounded-lg shadow-lg max-h-48 overflow-y-auto min-w-40 top-full left-0">
@@ -214,6 +266,17 @@ export function InstrumentRow({ instrumentId }: InstrumentRowProps) {
           </div>
         </div>
       </div>
+
+      {showEQModal && (
+        <EQModal
+          channelId={instrumentId}
+          title={instrument.name}
+          settings={channelSettings}
+          onVolumeChange={handleVolumeChange}
+          onEQChange={handleEQChange}
+          onClose={() => setShowEQModal(false)}
+        />
+      )}
     </div>
   );
 }
